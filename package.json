@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test",
+    "check:links": "node scripts/check-links.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
