@@ -1,13 +1,38 @@
 <!DOCTYPE html>
-<html lang="">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vite App</title>
+    <meta name="theme-color" content="#080d16">
+    <title>Kyrian | Frontend Developer</title>
+    <meta name="description" content="Kyrian is a junior frontend developer based in Germany, building responsive web applications with Vue.js and JavaScript. Explore four live projects and their source code.">
+    <link rel="canonical" href="https://kyrian-portfolio.vercel.app/">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Kyrian | Frontend Developer">
+    <meta property="og:description" content="Thoughtful interfaces. Practical applications. Explore my Vue.js and JavaScript portfolio.">
+    <meta property="og:url" content="https://kyrian-portfolio.vercel.app/">
+    <meta property="og:image" content="https://kyrian-portfolio.vercel.app/images/social-preview.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Kyrian, Frontend Developer. Vue.js, JavaScript, and responsive interfaces.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Kyrian | Frontend Developer">
+    <meta name="twitter:description" content="Explore four live frontend projects built with Vue.js and JavaScript.">
+    <meta name="twitter:image" content="https://kyrian-portfolio.vercel.app/images/social-preview.png">
+    <script>
+      try {
+        const savedTheme = localStorage.getItem('kyrian-theme');
+        if (savedTheme === 'light' || savedTheme === 'dark') document.documentElement.dataset.theme = savedTheme;
+      } catch { /* Use the default theme when browser storage is unavailable. */ }
+      document.querySelector('meta[name="theme-color"]').content = document.documentElement.dataset.theme === 'light' ? '#f8fafc' : '#080d16';
+    </script>
   </head>
   <body>
     <div id="app"></div>
+    <noscript>This portfolio needs JavaScript to display the project gallery. Contact Kyrian at <a href="mailto:kyrian.dev.de@gmail.com">kyrian.dev.de@gmail.com</a> or visit <a href="https://github.com/kyrian-dev">GitHub</a>.</noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

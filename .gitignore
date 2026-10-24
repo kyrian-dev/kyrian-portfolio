@@ -44,3 +44,8 @@ dist/
 .env.*
 !.env.example
 .vercel/
+
+# Local review artifacts and package cache
+.review/
+.npm-cache/
+review-mobile.html

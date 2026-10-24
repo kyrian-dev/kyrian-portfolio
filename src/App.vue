@@ -1,997 +1,202 @@
-
 <script setup>
-import { ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import ProjectCard from './components/ProjectCard.vue'
+import { categories, projects } from './data/projects.js'
+import './assets/portfolio.css'
 
-const mobileMenuOpen = ref(false)
+const menuOpen = ref(false)
+const menuButton = ref(null)
+const navigationMenu = ref(null)
+const activeSection = ref('home')
+const theme = ref(document.documentElement.dataset.theme || 'dark')
+const query = ref('')
+const category = ref('All')
+const view = ref('grid')
+const scrollProgress = ref(0)
+const year = new Date().getFullYear()
+const skills = ['HTML5', 'CSS3', 'JavaScript', 'Vue.js 3', 'Responsive Design', 'Git & GitHub']
+const navigation = [{ id: 'projects', name: 'Projects' }, { id: 'about', name: 'About' }, { id: 'contact', name: 'Contact' }]
+const filteredProjects = computed(() => {
+  const search = query.value.trim().toLowerCase()
+  return projects.filter(project => (category.value === 'All' || project.category === category.value)
+    && [project.title, project.category, project.problem, project.solution, ...project.stack, ...project.features].join(' ').toLowerCase().includes(search))
+})
 
-const links = [
-  { label: 'Home', href: '#home' },
-  { label: 'About', href: '#about' },
-  { label: 'Skills', href: '#skills' },
-  { label: 'Projects', href: '#projects' },
-  { label: 'Contact', href: '#contact' }
-]
-
-
-const skills = [
-  { name: 'HTML5', icon: '🌐', category: 'Frontend' },
-  { name: 'CSS3', icon: '🎨', category: 'Styling' },
-  { name: 'JavaScript', icon: '⚡', category: 'Programming' },
-  { name: 'Vue.js', icon: '💚', category: 'Framework' },
-  { name: 'Responsive Design', icon: '📱', category: 'Web Design' },
-  { name: 'Git & GitHub', icon: '🔗', category: 'Version Control' }
-]
-
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = theme.value
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.value === 'dark' ? '#080d16' : '#f8fafc')
+  try { localStorage.setItem('kyrian-theme', theme.value) } catch { /* Keep the toggle usable without storage. */ }
+}
+function resetFilters() {
+  category.value = 'All'
+  query.value = ''
+}
+async function toggleMenu() {
+  menuOpen.value = !menuOpen.value
+  if (menuOpen.value) {
+    await nextTick()
+    navigationMenu.value?.querySelector('a')?.focus()
+  }
+}
+async function closeMenuForSection(id) {
+  const wasOpen = menuOpen.value
+  menuOpen.value = false
+  if (wasOpen) {
+    await nextTick()
+    document.getElementById(id)?.focus({ preventScroll: true })
+  }
+}
+async function closeMenuWithEscape(event) {
+  if (event.key !== 'Escape' || !menuOpen.value) return
+  menuOpen.value = false
+  await nextTick()
+  menuButton.value?.focus()
+}
+let observer
+let layoutObserver
+let scrollFrame = 0
+function updateProgress() {
+  if (scrollFrame) return
+  scrollFrame = requestAnimationFrame(() => {
+    const distance = document.documentElement.scrollHeight - innerHeight
+    scrollProgress.value = distance > 0 ? Math.min(1, Math.max(0, scrollY / distance)) : 0
+    scrollFrame = 0
+  })
+}
+function observeSections() {
+  observer?.disconnect()
+  observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => { if (entry.isIntersecting) activeSection.value = entry.target.id })
+  }, { rootMargin: `-${Math.round(innerHeight * .15)}px 0px -${Math.round(innerHeight * .65)}px 0px` })
+  document.querySelectorAll('[data-section]').forEach(section => observer.observe(section))
+}
+function onResize() {
+  observeSections()
+  updateProgress()
+}
+onMounted(() => {
+  observeSections()
+  layoutObserver = new ResizeObserver(updateProgress)
+  layoutObserver.observe(document.getElementById('main'))
+  window.addEventListener('scroll', updateProgress, { passive: true })
+  window.addEventListener('resize', onResize)
+  document.addEventListener('keydown', closeMenuWithEscape)
+  updateProgress()
+})
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  layoutObserver?.disconnect()
+  cancelAnimationFrame(scrollFrame)
+  window.removeEventListener('scroll', updateProgress)
+  window.removeEventListener('resize', onResize)
+  document.removeEventListener('keydown', closeMenuWithEscape)
+})
 </script>
 
 <template>
-  <div>
-    <header class="navbar">
-      <a href="#home" class="logo">Kyrian<span>.</span></a>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="reading-progress" :style="{ transform: 'scaleX(' + scrollProgress + ')' }" aria-hidden="true"></div>
+    <div class="header-inner">
+      <a href="#home" class="brand" aria-label="Kyrian, home" @click="menuOpen = false">
+        <span class="brand-mark" aria-hidden="true">KY</span>
+        <span class="brand-name">Kyrian.<small>// frontend developer</small></span>
+      </a>
+      <div class="header-actions">
+        <nav ref="navigationMenu" id="main-navigation" :class="{ 'is-open': menuOpen }" aria-label="Main navigation">
+          <a v-for="link in navigation" :key="link.id" :href="'#' + link.id" :aria-current="activeSection === link.id ? 'location' : undefined" @click="closeMenuForSection(link.id)">{{ link.name }}</a>
+        </nav>
+        <button class="icon-button theme-toggle" type="button" @click="toggleTheme" :aria-label="'Switch to ' + (theme === 'dark' ? 'light' : 'dark') + ' theme'" :title="'Switch to ' + (theme === 'dark' ? 'light' : 'dark') + ' theme'">
+          <svg v-if="theme === 'dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20.5 14A8.5 8.5 0 0 1 10 3.5 8.5 8.5 0 1 0 20.5 14Z"/></svg>
+        </button>
+        <button ref="menuButton" class="icon-button menu-toggle" type="button" :aria-expanded="menuOpen" aria-controls="main-navigation" :aria-label="menuOpen ? 'Close navigation' : 'Open navigation'" @click="toggleMenu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path v-if="menuOpen" d="m6 6 12 12M6 18 18 6"/><path v-else d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
 
-      <button
-        class="menu-toggle"
-        type="button"
-        @click="mobileMenuOpen = !mobileMenuOpen"
-        :aria-expanded="mobileMenuOpen"
-        aria-label="Toggle navigation"
-      >
-        ☰
-      </button>
+  <main id="main" tabindex="-1">
+    <section id="home" class="hero section-shell" data-section aria-labelledby="hero-title">
+      <div class="availability"><span aria-hidden="true"></span> Open to junior frontend opportunities</div>
+      <h1 id="hero-title">Hi, I'm<br><span class="gradient-text">Kyrian.</span></h1>
+      <p class="hero-role">Frontend Development <span>·</span> Vue.js <span>·</span> JavaScript<span class="cursor" aria-hidden="true"></span></p>
+      <p class="hero-description">A junior frontend developer based in Germany.<br>I turn ideas into <strong>responsive, interactive web applications.</strong></p>
+      <div class="button-row hero-buttons">
+        <a class="button button-primary" href="#projects">View Projects <span aria-hidden="true">→</span></a>
+        <a class="button" href="#about">About Me</a>
+        <a class="button" href="#contact">Contact</a>
+        <a class="button" href="https://github.com/kyrian-dev" target="_blank" rel="noopener noreferrer" aria-label="Kyrian's GitHub profile (opens in a new tab)">GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+      <dl class="hero-stats">
+        <div><dt>4</dt><dd>Live projects</dd></div>
+        <div><dt>Vue 3</dt><dd>Main framework</dd></div>
+        <div><dt>ILS</dt><dd>Hamburg training</dd></div>
+        <div><dt>Germany</dt><dd>Based in</dd></div>
+      </dl>
+    </section>
 
-      <nav :class="{ open: mobileMenuOpen }" aria-label="Main navigation">
-        <a
-          v-for="link in links"
-          :key="link.href"
-          :href="link.href"
-          @click="mobileMenuOpen = false"
-        >
-          {{ link.label }}
-        </a>
-      </nav>
-    </header>
+    <section class="intro section-shell" aria-labelledby="intro-title">
+      <div class="intro-copy">
+        <p class="eyebrow">// From idea to interface</p>
+        <h2 id="intro-title">Thoughtful interfaces.<br><span class="gradient-text">Practical applications.</span></h2>
+        <p>From organising tasks to browsing a storefront, I build interfaces that make everyday actions feel straightforward.</p>
+        <div class="button-row"><a class="button button-primary pill-button" href="#projects">Explore My Work <span aria-hidden="true">→</span></a><a class="button pill-button" href="#contact">Get in Touch</a></div>
+      </div>
+      <figure class="portrait-frame">
+        <img src="/images/profile.webp" alt="Kyrian, frontend developer" width="700" height="700" fetchpriority="high">
+        <figcaption><span class="status-dot" aria-hidden="true"></span> Kyrian <span class="portrait-caption">Frontend Developer · Germany</span></figcaption>
+      </figure>
+    </section>
 
-    <main>
-      <section id="home" class="hero">
-        <div class="hero-content">
-          <p class="eyebrow">WELCOME TO MY PORTFOLIO</p>
-          <h1>Hi, I'm <span>Kyrian.</span></h1>
-          <h2>Junior Frontend Web Developer</h2>
-          <p class="description">
-            I build responsive, modern and user-friendly
-            websites and web applications using frontend technologies.
-          </p>
+    <div class="tech-strip section-shell" aria-label="Technologies I work with">
+      <span class="tech-strip-label">Built with tools I know</span>
+      <ul><li><span class="tech-symbol">&lt;/&gt;</span> HTML5</li><li><span class="tech-symbol">#</span> CSS3</li><li><span class="tech-symbol boxed">JS</span> JavaScript</li><li><span class="tech-symbol vue-symbol">V</span> Vue.js</li><li><span class="tech-symbol">ϟ</span> Vite</li><li><span class="tech-symbol">⌘</span> Git & GitHub</li></ul>
+    </div>
 
-          <div class="hero-buttons">
-            <a href="#projects" class="btn primary">View My Work →</a>
-            <a href="#contact" class="btn secondary">Contact Me</a>
+    <section id="projects" class="section-shell content-section" data-section tabindex="-1" aria-labelledby="projects-title">
+      <p class="eyebrow">// Featured projects</p>
+      <h2 id="projects-title">My Frontend Portfolio</h2>
+      <p class="section-description">Four applications, four everyday problems. Explore the interfaces, try the live demos, and look through the code.</p>
+      <div class="project-toolbar">
+        <div class="search-row">
+          <label class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span class="sr-only">Search projects</span><input v-model="query" type="search" placeholder="Search by project, feature, or technology..."></label>
+          <div class="view-switch" role="group" aria-label="Project layout">
+            <button class="icon-button" type="button" :aria-pressed="view === 'grid'" aria-label="Grid view" title="Grid view" @click="view = 'grid'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button>
+            <button class="icon-button" type="button" :aria-pressed="view === 'list'" aria-label="List view" title="List view" @click="view = 'list'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"/></svg></button>
           </div>
         </div>
+        <div class="filter-row" role="group" aria-label="Filter projects by category"><span class="filter-label">Category:</span><button v-for="item in categories" :key="item" type="button" class="filter-chip" :aria-pressed="category === item" @click="category = item">{{ item }}<span v-if="item === 'All'"> ({{ projects.length }})</span></button></div>
+      </div>
+      <div class="project-summary"><p aria-live="polite" aria-atomic="true">{{ filteredProjects.length }} {{ filteredProjects.length === 1 ? 'project' : 'projects' }} to explore</p><button v-if="query || category !== 'All'" class="text-button" @click="resetFilters">Reset filters <span aria-hidden="true">↺</span></button><span v-else class="project-demo-note">Personal projects · Live frontend demos</span></div>
+      <div v-if="filteredProjects.length" class="project-grid" :class="{ 'list-view': view === 'list' }"><ProjectCard v-for="project in filteredProjects" :key="project.id" :project="project"/></div>
+      <div v-else class="empty-state"><h3>No projects found</h3><p>Try another search or choose a different category.</p><button class="button button-primary" @click="resetFilters">Show all projects</button></div>
+    </section>
 
-       <div class="hero-visual">
-       <img
-       src="/images/profile.jpg"
-       alt="Kyrian - Frontend Web Developer"
-       class="profile-photo"/>
-    </div>
-      </section>
+    <section class="section-shell notes-section" aria-labelledby="notes-title">
+      <p class="eyebrow">// Inside the builds</p><h2 id="notes-title">Project Notes</h2><p class="section-description">A closer look at the features, setup, and scope of the work.</p>
+      <div class="notes-grid"><a v-for="project in projects.slice(0, 3)" :key="project.id" class="note-card" :href="project.source + '#readme'" target="_blank" rel="noopener noreferrer" :aria-label="'Read ' + project.title + ' project notes on GitHub (opens in a new tab)'"><span class="note-number">0{{ project.id }}</span><h3>{{ project.title }}</h3><p>{{ project.notes }}</p><span class="text-link">Read project notes <span aria-hidden="true">↗</span></span></a></div>
+    </section>
 
-      
-<section id="about" class="section">
-  <p class="eyebrow">GET TO KNOW ME</p>
-  <h2>About Me</h2>
+    <section id="about" class="section-shell content-section" data-section tabindex="-1" aria-labelledby="about-title">
+      <p class="eyebrow">// Who I am</p><h2 id="about-title">About Me</h2>
+      <div class="about-grid">
+        <div>
+          <h3 class="small-heading">Technical skills</h3><ul class="skill-grid"><li v-for="skill in skills" :key="skill">{{ skill }}</li></ul>
+          <h3 class="small-heading education-heading">Education & training</h3><div class="timeline"><div class="timeline-item"><h4>Geprüfter Webentwickler</h4><p class="education-school">ILS Hamburg, Germany</p><p>Professional training in Web Development<br><time datetime="2025-03">March 2025</time> – <time datetime="2026-04">April 2026</time></p></div></div>
+          <div class="location-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg> Based in Germany</div>
+        </div>
+        <div class="about-copy"><h3 class="small-heading">What I bring</h3><p>I'm Kyrian, a junior frontend developer who enjoys turning a useful idea into something people can interact with.</p><p>After completing my web development training at ILS Hamburg, I've been building with HTML, CSS, JavaScript, and Vue.js. My portfolio explores practical interfaces: task boards, job application tracking, online shopping, and a taxi booking demo.</p><p>I focus on responsive layouts, clear interactions, and maintainable code. I'm looking for a junior frontend role where I can contribute to a team, learn through feedback, and keep improving my craft.</p><div class="button-row"><a class="button button-primary" href="mailto:kyrian.dev.de@gmail.com?subject=CV%20Request">Request CV <span aria-hidden="true">→</span></a><a class="button" href="https://www.linkedin.com/in/obiekee-kyrian-ikechukwu-563022308/" target="_blank" rel="noopener noreferrer" aria-label="Kyrian's LinkedIn profile (opens in a new tab)">LinkedIn <span aria-hidden="true">↗</span></a></div></div>
+      </div>
+    </section>
 
-  <div class="about-content">
-    <div class="about-text">
-      <h3>Turning Ideas into Digital Experiences</h3>
-
-      <p>
-        I'm Kyrian, a Junior Frontend Web Developer based
-        in Germany, passionate about creating modern,
-        responsive, and user-friendly web applications.
-      </p>
-
-      <p>
-        I completed my professional training in Web Development
-        at ILS Hamburg (March 2025 – April 2026), earning
-        a certificate as a Geprüfter Webentwickler.
-      </p>
-
-      <p>
-        My technical skills include HTML, CSS, JavaScript,
-        and Vue.js. I focus on building functional interfaces,
-        writing maintainable code, and delivering smooth
-        user experiences across different devices.
-      </p>
-
-      <p>
-        I'm currently seeking an opportunity as a
-        Junior Frontend Developer to contribute to
-        meaningful projects and grow professionally.
-      </p>
-    </div>
-
-    <div class="about-card">
-      <h3>Quick Facts</h3>
-
-      <p><strong>Location:</strong> Germany</p>
-      <p><strong>Education:</strong> ILS Hamburg</p>
-      <p><strong>Qualification:</strong> Geprüfter Webentwickler</p>
-      <p><strong>Focus:</strong> Frontend Development</p>
-      <p><strong>Availability:</strong> Open to Opportunities</p>
-    </div>
-  </div>
-</section>
-
-
-      
-<section id="skills" class="section skills-section">
-  <p class="eyebrow">MY TECH STACK</p>
-  <h2>Technical Skills</h2>
-
-  <p class="section-text">
-    Technologies and tools I use to build modern,
-    responsive, and interactive web applications.
-  </p>
-
-  <div class="skills-container">
-    <div
-      v-for="skill in skills"
-      :key="skill.name"
-      class="skill-card"
-    >
-      <div class="skill-icon">{{ skill.icon }}</div>
-
-      <h3>{{ skill.name }}</h3>
-
-      <p>{{ skill.category }}</p>
-    </div>
-  </div>
-</section>
-      <section id="projects" class="section">
-  <p class="eyebrow">MY WORK</p>
-  <h2>Featured Projects</h2>
-  <p class="section-text">
-    Explore four projects I've built, with live demos you can try.
-  </p>
-
-  <div class="projects-grid">
-    <article class="project-card">
-      <p class="project-category">PRODUCTIVITY</p>
-      <h3>Taskflow Studio</h3>
-      <p class="project-description">
-        A task management application designed to help users
-        organise their work and stay focused.
-      </p>
-
-      <ul class="project-tech" aria-label="Technologies used">
-      <li>Vue.js</li>
-      <li>JavaScript</li>
-      <li>HTML5</li>
-      <li>CSS3</li>
-      <li>Vite</li>
-      </ul>
-      <div class="project-actions">
-  <a
-    href="https://taskflow-studio-eight.vercel.app/"
-    class="btn primary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View Taskflow Studio live demo (opens in a new tab)"
-  >
-    Live Demo ↗
-  </a>
-
-  <a
-    href="https://github.com/kyrian-dev/taskflow-studio"
-    class="btn secondary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View Taskflow Studio source code on GitHub (opens in a new tab)"
-  >
-    GitHub ↗
-  </a>
-</div>
-    </article>
-
-    <article class="project-card">
-      <p class="project-category">CAREER TOOLS</p>
-      <h3>Job Application Tracker</h3>
-      <p class="project-description">
-        An application for keeping job applications organised
-        throughout the job search.
-      </p>
-     <ul class="project-tech" aria-label="Technologies used">
-     <li>Vue.js 3</li>
-     <li>JavaScript</li>
-     <li>Vite</li>
-     <li>CSS3</li>
-     <li>HTML5</li>
-     <li>Browser Local Storage</li>
-     </ul>
-      <div class="project-actions">
-  <a
-    href="https://job-application-tracker-rho-nine.vercel.app/"
-    class="btn primary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View Job Application Tracker live demo (opens in a new tab)"
-  >
-    Live Demo ↗
-  </a>
-
-  <a
-    href="https://github.com/kyrian-dev/job-application-tracker"
-    class="btn secondary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View Job Application Tracker source code on GitHub (opens in a new tab)"
-  >
-    GitHub ↗
-  </a>
-</div>
-       </article>
-
-    <article class="project-card">
-      <p class="project-category">E-COMMERCE</p>
-      <h3>NovaShop</h3>
-      <p class="project-description">
-        An e-commerce storefront presenting products through
-        a clear, approachable shopping interface.
-      </p>
-      <ul class="project-tech" aria-label="Technologies used">
-  <li>Vue.js 3</li>
-  <li>JavaScript</li>
-  <li>Vite</li>
-  <li>CSS3</li>
-  <li>HTML5</li>
-
-</ul>
-
-      <div class="project-actions">
-  <a
-    href="https://novashop-mauve.vercel.app/"
-    class="btn primary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View NovaShop live demo (opens in a new tab)"
-  >
-    Live Demo ↗
-  </a>
-
-  <a
-    href="https://github.com/kyrian-dev/novashop"
-    class="btn secondary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View NovaShop source code on GitHub (opens in a new tab)"
-  >
-    GitHub ↗
-  </a>
-</div>
-    </article>
-
-    <article class="project-card">
-      <p class="project-category">TRANSPORT</p>
-      <h3>CityTaxi</h3>
-      <p class="project-description">
-        A taxi booking interface designed around a simple
-        and convenient ride booking experience.
-      </p>
-      <div class="project-actions">
-        <ul class="project-tech" aria-label="Technologies used">
-  <li>Vue 3 — Composition API</li>
-  <li>JavaScript</li>
-  <li>Vite</li>
-  <li>CSS</li>
-  <li>Browser localStorage</li>
-</ul>
-  <a
-    href="https://citytaxi-jade.vercel.app/"
-    class="btn primary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View CityTaxi live demo (opens in a new tab)"
-  >
-    Live Demo ↗
-  </a>
-
-  <a
-    href="https://github.com/kyrian-dev/citytaxi"
-    class="btn secondary"
-    target="_blank"
-    rel="noopener noreferrer"
-    aria-label="View CityTaxi source code on GitHub (opens in a new tab)"
-  >
-    GitHub ↗
-  </a>
-</div>
-    </article>
-  </div>
-</section>
-
-      <section id="contact" class="section">
-  <p class="eyebrow">LET'S CONNECT</p>
-  <h2>Contact Me</h2>
-
-  <p class="section-text">
-    Interested in working together? Get in touch.
-  </p>
-
-  <div class="contact-actions">
-    <a
-      class="btn primary"
-      href="mailto:kyrian.dev.de@gmail.com"
-    >
-      Send an Email
-    </a>
-
-    <a
-      href="https://github.com/kyrian-dev"
-      class="btn secondary"
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Visit Kyrian's GitHub profile (opens in a new tab)"
-    >
-      GitHub ↗
-    </a>
-    <a
-     href="https://www.linkedin.com/in/obiekee-kyrian-ikechukwu-563022308/"
-     class="btn secondary"
-     target="_blank"
-     rel="noopener noreferrer"
-     aria-label="Visit Kyrian's LinkedIn profile (opens in a new tab)"
-    >
-    LinkedIn ↗
-</a>
-  </div>
-</section>
-    </main>
-
-    <footer>© {{ new Date().getFullYear() }} Kyrian. All rights reserved.</footer>
-  </div>
+    <section id="contact" class="contact-section" tabindex="-1" data-section aria-labelledby="contact-title"><div class="section-shell contact-inner">
+      <div class="availability"><span aria-hidden="true"></span> Open to opportunities</div><h2 id="contact-title">Let's build something<br><span class="gradient-text">worth using.</span></h2><p>Looking for a junior frontend developer?<br>I'd love to hear about your team and what you're building.</p>
+      <a class="contact-email" href="mailto:kyrian.dev.de@gmail.com"><span><small>Email</small><strong>kyrian.dev.de@gmail.com</strong></span><span class="contact-arrow" aria-hidden="true">↗</span></a>
+      <div class="button-row contact-buttons"><a class="button" href="https://www.linkedin.com/in/obiekee-kyrian-ikechukwu-563022308/" target="_blank" rel="noopener noreferrer" aria-label="Kyrian's LinkedIn profile (opens in a new tab)">LinkedIn <span aria-hidden="true">↗</span></a><a class="button" href="https://github.com/kyrian-dev" target="_blank" rel="noopener noreferrer" aria-label="Kyrian's GitHub profile (opens in a new tab)">GitHub <span aria-hidden="true">↗</span></a><a class="button button-primary" href="mailto:kyrian.dev.de@gmail.com?subject=CV%20Request">Request CV <span aria-hidden="true">→</span></a></div>
+    </div></section>
+  </main>
+  <footer class="site-footer"><div class="section-shell footer-inner"><p>© {{ year }} Kyrian. <span>Built with Vue.js · Germany</span></p><div><a href="https://github.com/kyrian-dev" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a href="mailto:kyrian.dev.de@gmail.com">Email</a><a href="#home">Back to top ↑</a></div></div></footer>
 </template>
-
-<style>
-* {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  background: #0b1120;
-  color: #f8fafc;
-  font-family: Inter, Arial, sans-serif;
-}
-
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-.navbar {
-  height: 82px;
-  max-width: 1200px;
-  margin: auto;
-  padding: 0 30px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo {
-  font-size: 27px;
-  font-weight: 800;
-}
-
-.logo span,
-.hero h1 span,
-.eyebrow {
-  color: #38bdf8;
-}
-
-nav {
-  display: flex;
-  gap: 32px;
-}
-
-nav a {
-  color: #cbd5e1;
-  font-size: 14px;
-  transition: color 0.2s;
-}
-
-nav a:hover {
-  color: #38bdf8;
-}
-
-.menu-toggle {
-  display: none;
-}
-
-.hero {
-  max-width: 1200px;
-  margin: auto;
-  min-height: 650px;
-  padding: 100px 30px;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 60px;
-  align-items: center;
-}
-
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 3px;
-  font-weight: 700;
-}
-
-.hero h1 {
-  font-size: clamp(44px, 6vw, 76px);
-  letter-spacing: -2px;
-  margin: 20px 0 8px;
-}
-
-.hero h2 {
-  font-size: clamp(24px, 3vw, 36px);
-  margin: 0;
-  color: #cbd5e1;
-}
-
-.description,
-.section-text {
-  color: #94a3b8;
-  line-height: 1.9;
-  font-size: 17px;
-  max-width: 570px;
-}
-
-.description {
-  margin: 28px 0 36px;
-}
-
-.hero-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.btn {
-  display: inline-block;
-  padding: 14px 26px;
-  border-radius: 9px;
-  font-weight: 600;
-  transition: transform 0.2s;
-}
-
-.btn:hover {
-  transform: translateY(-3px);
-}
-
-.primary {
-  background: #38bdf8;
-  color: #08111f;
-}
-
-.secondary {
-  border: 1px solid #475569;
-  color: white;
-}
-
-.code-card {
-  background: #111c30;
-  border: 1px solid #334155;
-  border-radius: 18px;
-  padding: 25px;
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.3);
-}
-
-.dots {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 30px;
-}
-
-.dots i {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fb7185;
-}
-
-.dots i:nth-child(2) {
-  background: #fbbf24;
-}
-
-.dots i:nth-child(3) {
-  background: #4ade80;
-}
-
-pre {
-  overflow-x: auto;
-  color: #7dd3fc;
-  line-height: 2;
-  font-size: 15px;
-}
-
-.section {
-  max-width: 1200px;
-  margin: auto;
-  padding: 85px 30px;
-  scroll-margin-top: 40px;
-}
-
-.section h2 {
-  font-size: clamp(30px, 4vw, 44px);
-  margin: 15px 0 20px;
-}
-
-.skills-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 30px;
-}
-
-.skill {
-  padding: 14px 20px;
-  border: 1px solid #334155;
-  border-radius: 9px;
-  background: #111c30;
-}
-
-footer {
-  text-align: center;
-  padding: 35px 20px;
-  border-top: 1px solid #1e293b;
-  color: #94a3b8;
-}
-
-@media (max-width: 768px) {
-  .navbar {
-    height: 72px;
-    padding: 0 20px;
-  }
-
-  .menu-toggle {
-    display: block;
-    background: none;
-    border: 0;
-    color: white;
-    font-size: 27px;
-    cursor: pointer;
-  }
-
-  nav {
-    display: none;
-    position: absolute;
-    top: 72px;
-    left: 0;
-    right: 0;
-    background: #111c30;
-    padding: 25px;
-    flex-direction: column;
-    z-index: 10;
-  }
-
-  nav.open {
-    display: flex;
-  }
-
-  .hero {
-    grid-template-columns: 1fr;
-    min-height: auto;
-    padding: 70px 20px;
-    gap: 35px;
-  }
-
-  .section {
-    padding: 65px 20px;
-  }
-  }
-
-
-  .hero-visual {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.profile-photo {
-  width: 320px;
-  height: 320px;
-  max-width: 100%;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 50%;
-  border: 4px solid #38bdf8;
-  box-shadow: 0 0 50px rgba(56, 189, 248, 0.25);
-}
-
-@media (max-width: 768px) {
-  .profile-photo {
-    width: 250px;
-    height: 250px;
-  }
-}
-
-.about-content {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr;
-  gap: 50px;
-  align-items: start;
-  margin-top: 35px;
-}
-
-.about-text h3 {
-  font-size: 25px;
-  margin-top: 0;
-  color: #f8fafc;
-}
-
-.about-text p {
-  color: #94a3b8;
-  font-size: 16px;
-  line-height: 1.9;
-  margin-bottom: 20px;
-}
-
-.about-card {
-  background: #111c30;
-  border: 1px solid #334155;
-  border-radius: 16px;
-  padding: 30px;
-}
-
-.about-card h3 {
-  color: #38bdf8;
-  margin-top: 0;
-  font-size: 23px;
-}
-
-.about-card p {
-  color: #cbd5e1;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-}
-
-.about-card strong {
-  color: #f8fafc;
-}
-
-@media (max-width: 768px) {
-  .about-content {
-    grid-template-columns: 1fr;
-    gap: 25px;
-  }
-}
-
-
-.skills-container {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px;
-  margin-top: 40px;
-}
-
-.skill-card {
-  background: #111c30;
-  border: 1px solid #334155;
-  border-radius: 16px;
-  padding: 30px 20px;
-  text-align: center;
-  transition: transform 0.3s ease, border-color 0.3s ease;
-}
-
-.skill-card:hover {
-  transform: translateY(-6px);
-  border-color: #38bdf8;
-}
-
-.skill-icon {
-  font-size: 42px;
-  margin-bottom: 18px;
-}
-
-.skill-card h3 {
-  font-size: 19px;
-  color: #f8fafc;
-  margin: 0 0 10px;
-}
-
-.skill-card p {
-  color: #94a3b8;
-  font-size: 14px;
-  margin: 0;
-}
-
-
-
-@media (max-width: 900px) {
-  .skills-container {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 480px) {
-  .skills-container {
-    grid-template-columns: 1fr;
-  }
-
-  .skill-card {
-    padding: 25px 18px;
-  }
-}
-
-
-.projects-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 36px;
-}
-
-.project-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
-  padding: 30px;
-  background: #111c30;
-  border: 1px solid #334155;
-  border-radius: 16px;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.project-card:hover {
-  border-color: #38bdf8;
-  transform: translateY(-4px);
-}
-
-.project-category {
-  margin: 0 0 14px;
-  color: #38bdf8;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.project-card h3 {
-  margin: 0 0 14px;
-  font-size: 24px;
-  overflow-wrap: anywhere;
-}
-
-.project-description {
-  margin: 0 0 26px;
-  color: #94a3b8;
-  line-height: 1.8;
-}
-
-.project-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: auto;
-}
-
-.project-card a:focus-visible {
-  outline: 3px solid #f8fafc;
-  outline-offset: 5px;
-}
-
-@media (max-width: 640px) {
-  .projects-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .project-card {
-    padding: 24px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .project-card,
-  .project-card .btn {
-    transition: none;
-    transform: none;
-  }
-}
-.project-tech {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  list-style: none;
-  padding: 0;
-  margin: 0 0 24px;
-}
-
-.project-tech li {
-  padding: 6px 12px;
-  border: 1px solid #334155;
-  border-radius: 20px;
-  background: #0b1120;
-  color: #7dd3fc;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.contact-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 24px;
-}
-
-/* DARK & ELEGANT THEME */
-
-:root {
-  --page-bg: #191216;
-  --surface: #281c23;
-  --text: #fff5eb;
-  --muted: #c5b3bb;
-  --accent: #e8bd78;
-  --accent-hover: #f3d39e;
-  --border: #49323e;
-}
-
-body {
-  background: var(--page-bg);
-  color: var(--text);
-}
-
-.logo {
-  color: var(--text);
-}
-
-.logo span,
-.hero h1 span,
-.eyebrow,
-.about-card h3 {
-  color: var(--accent);
-}
-
-nav a,
-.hero h2,
-.about-card p {
-  color: var(--muted);
-}
-
-nav a:hover,
-nav a:focus-visible {
-  color: var(--accent);
-}
-
-.description,
-.section-text,
-.about-text p,
-.skill-card p,
-.project-description {
-  color: var(--muted);
-}
-
-.about-text h3,
-.about-card strong,
-.skill-card h3,
-.project-card h3 {
-  color: var(--text);
-}
-
-.about-card,
-.skill-card,
-.project-card,
-.code-card,
-.skill {
-  background: var(--surface);
-  border-color: var(--border);
-}
-
-.skill-card:hover,
-.project-card:hover {
-  border-color: var(--accent);
-}
-
-.btn {
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.primary {
-  background: var(--accent);
-  color: var(--page-bg);
-}
-
-.primary:hover {
-  background: var(--accent-hover);
-}
-
-.secondary {
-  background: transparent;
-  border-color: var(--border);
-  color: var(--text);
-}
-
-.secondary:hover {
-  background: var(--surface);
-  border-color: var(--accent);
-}
-
-.project-category,
-pre {
-  color: var(--accent);
-}
-
-.project-tech li {
-  background: var(--page-bg);
-  border-color: var(--border);
-  color: var(--accent);
-}
-
-.profile-photo {
-  border-color: var(--accent);
-  box-shadow: 0 0 50px rgba(196, 167, 255, 0.18);
-}
-
-.menu-toggle {
-  color: var(--text);
-}
-
-footer {
-  border-color: var(--border);
-  color: var(--muted);
-}
-
-a:focus-visible,
-button:focus-visible,
-.project-card a:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 5px;
-}
-
-::selection {
-  background: var(--accent);
-  color: var(--page-bg);
-}
-
-@media (max-width: 768px) {
-  nav {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  .btn,
-  .skill-card,
-  .project-card {
-    transition: none;
-  }
-
-  .btn:hover,
-  .skill-card:hover,
-  .project-card:hover {
-    transform: none;
-  }
-}
-
-.primary,
-.primary:hover {
-  color: #191216;
-}
-
-.profile-photo {
-  border-color: var(--accent);
-  box-shadow: none;
-}
-
-</style>
